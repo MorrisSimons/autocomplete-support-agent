@@ -1,4 +1,4 @@
-# Auto Complete Component for customer support 
+# Auto Complete solution for customer support 
 **Remaking this since 20 Aug 2025**
 
 ### GOAL OF REPO
@@ -11,12 +11,15 @@
 
 ##### Repo Goals
 - [ ] Be able to speed up customer supports ability to answer questions.
-- [ ] Make a custom component for streamlit other people can use.
+- [ ] Make a autocomplete custom component for streamlit other people can use.
 
 
-#### Future Goals
+#### Future Goals im interested in
 - [ ] mabye train a model on customer support data on how to answer questions.
 - [ ] mabye add a solution to add templates to the autocomplete solution.
+- [ ] Add customer information retrieval to the autocomplete solution. (get customer data from a database)
+- [ ] Mabye add a draft first soltuon then a HITL solution where you accept or reject the draft.
+
 
 ### progress so far.
 ![Auto Complete Component Demo](Resources/early_autcomplete_demo.gif)
