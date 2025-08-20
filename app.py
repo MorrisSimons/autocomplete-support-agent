@@ -1,5 +1,20 @@
 import streamlit as st
 import json
+import os
+from groq import Groq
+import dotenv
+from custom_text_input.component import copilot
+
+# Load environment variables
+dotenv.load_dotenv()
+
+# Initialize Groq client with API key from environment
+groq_api_key = os.getenv("GROQ_API_KEY")
+if not groq_api_key:
+    st.error("❌ GROQ_API_KEY environment variable not found. Please set it in your .env file.")
+    st.stop()
+
+groq_client = Groq(api_key=groq_api_key)
 
 # Page configuration
 st.set_page_config(
@@ -103,28 +118,37 @@ with col1:
     )
 
 
+
+
+
 with col2:
-    st.subheader("✍️ Agent Response")
+    st.subheader("✍️ Custom Component Test")
     
-    # Agent input box with autocomplete
-    agent_response = st.text_area(
-        "Type your response here (autocomplete suggestions will appear below):",
-        height=200,
-        placeholder="Start typing your response to the customer...",
-        key="agent_input"
+    # Test the custom component
+    st.write("🔧 **Debug Info:**")
+    st.write(f"API Key provided: {'✅ Yes' if groq_api_key else '❌ No'}")
+    st.write(f"API Key length: {len(groq_api_key) if groq_api_key else 0} characters")
+    
+    user_input = copilot(
+        prompt_template="Help me respond to this customer question: {text}",
+        api_url="https://api.groq.com/openai/v1/chat/completions",
+        api_key=groq_api_key,
+        rpm_limit=50,
+        height=400,
+        font_family="Arial",
+        model="llama3-8b-8192",
+        max_tokens=200,
+        temperature=0.7,
+        key="test_custom_component"
     )
     
-    # Placeholder for autocomplete suggestions
-    st.markdown("---")
-    st.markdown("**💡 Autocomplete Suggestions:**")
-    
-    # This is where we'll add the autocomplete logic later
-    if agent_response:
-        st.info("🔍 Searching knowledge base for suggestions...")
-        st.write("(Autocomplete suggestions will appear here)")
+    if user_input:
+        st.success("✅ AI Response Generated!")
+        st.write("**AI Suggestion:**")
+        st.write(user_input)
     else:
-        st.write("Start typing to see autocomplete suggestions")
-
+        st.info("💡 Type something in the custom component above to get AI-powered suggestions...")
+    
 # Footer
 st.markdown("---")
 st.markdown("*Built for Lysa Customer Support Team*")
