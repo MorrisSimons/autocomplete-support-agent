@@ -18,9 +18,9 @@ groq_client = Groq(api_key=groq_api_key)
 
 # Page configuration
 st.set_page_config(
-    page_title="Lysa Support Agent Tool",
-    page_icon="💬",
-    layout="wide"
+    page_title="Lysa customer support Copilot – Smart Support Suggestions",
+    layout="wide",
+    page_icon="💬"
 )
 
 # Title
@@ -33,50 +33,9 @@ col1, col2 = st.columns([1, 2])
 with col1:
     st.subheader("📋 Customer Questions")
     
-    # Question selector dropdown with title and description, 80% Swedish, 20% English
-    question_options = [
-        {
-            "title": "Vad är avgifterna för Lysa?",
-            "body": "Hej,\n\nJag undrar vilka avgifter som gäller för att öppna och ha ett ISK-konto hos Lysa. Kan ni ge mig en översikt över kostnaderna?\n\nTack på förhand!"
-        },
-        {
-            "title": "Hur öppnar jag ett konto?",
-            "body": "Hej,\n\nJag vill gärna börja spara hos Lysa. Kan ni beskriva steg-för-steg hur jag öppnar ett konto?\n\nMed vänlig hälsning,"
-        },
-        {
-            "title": "Vad är minsta möjliga investeringsbelopp?",
-            "body": "Hej,\n\nJag är intresserad av att börja investera hos er. Vad är det minsta beloppet jag kan sätta in för att starta?\n\nTack!"
-        },
-        {
-            "title": "Hur tar jag ut pengar?",
-            "body": "Hej,\n\nJag vill veta hur jag går tillväga för att ta ut pengar från mitt Lysa-konto. Kan ni förklara processen?\n\nTack på förhand!"
-        },
-        {
-            "title": "Vilka investeringsstrategier erbjuder ni?",
-            "body": "Hej,\n\nJag är nyfiken på vilka investeringsstrategier ni erbjuder. Kan ni ge en översikt över alternativen?\n\nTack!"
-        },
-        {
-            "title": "Hur ändrar jag mitt månadssparande?",
-            "body": "Hej,\n\nJag vill ändra beloppet på mitt månadssparande. Hur gör jag det hos Lysa?\n\nMed vänlig hälsning,"
-        },
-        {
-            "title": "Vad händer om jag flyttar utomlands?",
-            "body": "Hej,\n\nJag planerar att flytta utomlands. Hur påverkar det mitt konto och mitt sparande hos Lysa?\n\nTack för hjälpen!"
-        },
-        {
-            "title": "Hur lägger jag till ett uttagskonto?",
-            "body": "Hej,\n\nJag vill lägga till ett nytt bankkonto för uttag. Hur gör jag det hos er?\n\nTack!"
-        },
-        # 20% English questions
-        {
-            "title": "What is the tax treatment for ISK?",
-            "body": "Hello,\n\nCould you please explain how ISK accounts are taxed? I would like to understand the tax implications.\n\nThank you!"
-        },
-        {
-            "title": "How do I contact customer support?",
-            "body": "Hello,\n\nI need assistance and would like to contact your customer support. What are the available ways to reach your team?\n\nBest regards,"
-        }
-    ]
+    # Load question options from external JSON file
+    with open("questions.json", "r", encoding="utf-8") as f:
+        question_options = json.load(f)
     questions = [f"{q['title']}" for q in question_options]
     
     selected_question = st.selectbox(
@@ -118,16 +77,8 @@ with col1:
     )
 
 
-
-
-
 with col2:
     st.subheader("✍️ Custom Component Test")
-    
-    # Test the custom component
-    st.write("🔧 **Debug Info:**")
-    st.write(f"API Key provided: {'✅ Yes' if groq_api_key else '❌ No'}")
-    st.write(f"API Key length: {len(groq_api_key) if groq_api_key else 0} characters")
     
     user_input = copilot(
         prompt_template="Help me respond to this customer question: {text}",
@@ -143,11 +94,10 @@ with col2:
     )
     
     if user_input:
-        st.success("✅ AI Response Generated!")
-        st.write("**AI Suggestion:**")
-        st.write(user_input)
+        st.success("AI Response Generated!")
+
     else:
-        st.info("💡 Type something in the custom component above to get AI-powered suggestions...")
+        st.info("Type in the box above to generate an AI response.")
     
 # Footer
 st.markdown("---")

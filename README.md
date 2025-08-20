@@ -27,7 +27,8 @@
 
 
 ### TODOS: 
-- [ ] Fix some errors with falied requests.
+- [ ] Make it possible to press tab to accept the suggestion.
+- [ ] The script is hardcoded in streamlit_copilot.tsx to only use the groq api, make it possible to use other apis.
 - [ ] add cost calculator.
 - [ ] Give LLM tools to look in knowledge base.
 - [ ] Give the LLM access to the question we want to answer.
