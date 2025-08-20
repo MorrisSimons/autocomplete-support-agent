@@ -62,10 +62,11 @@ class Copilot extends StreamlitComponentBase<State> {
             alignItems: 'center'
           }}>
             <div>
-              📊 <strong>API Stats:</strong> Total: {this.state.totalRequests} | 
+               <strong>API Stats:</strong> Total: {this.state.totalRequests} | 
               ✅ Success: {this.state.successfulRequests} | 
               ❌ Failed: {this.state.failedRequests} | 
-              ⏱️ This minute: {this.state.requestsThisMinute}/{this.props.args["rpm_limit"]}
+              {/* Shows how many API requests have been made in the current minute, out of the allowed requests per minute (RPM) limit */}
+              Requests this per minute / limit: {this.state.requestsThisMinute} / {this.props.args["rpm_limit"]}
             </div>
             <button
               onClick={this.resetCounters}
@@ -285,10 +286,6 @@ private callApi = async (text: string, api_upl: string): Promise<string> => {
   }
 
   try {
-    console.log("🚀 Making API call to:", api_upl);
-    console.log("📤 Request payload:", payload);
-    console.log("🔑 Headers:", headers);
-    
     // Increment total requests counter
     this.setState(prevState => ({
       totalRequests: prevState.totalRequests + 1
@@ -301,12 +298,9 @@ private callApi = async (text: string, api_upl: string): Promise<string> => {
       signal: this.abortController.signal
     });
 
-    console.log("📡 Response status:", response.status);
-    console.log("📡 Response headers:", response.headers);
-
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("❌ API Error Response:", errorText);
+      console.error("API Error Response:", errorText);
       
       // Increment failed requests counter
       this.setState(prevState => ({
