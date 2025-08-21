@@ -90,14 +90,14 @@ with col2:
 
 
     user_input = copilot(
-        prompt_template="Complete the following the for the right answer to the questiom: {text}",
+        prompt_template="[SYSTEM] You are a autocomplte for Lysa customer support. Thinking short with as few words as possible and always use <answer> tags for your final response.\n\nCustomer Question Title: {question_title}\n\nCustomer Question Details: {text}\n\nProvide a helpful response using <answer> tags:\n<answer>\nYour response here...\n</answer>",
         api_url="https://api.groq.com/openai/v1/chat/completions",
         api_key=groq_api_key,
         rpm_limit=50,
         height=400,
         font_family="Arial",
         model="deepseek-r1-distill-llama-70b",
-        max_tokens=100,
+        max_tokens=400,
         temperature=0.7,
         key="test_custom_component",
         token_cost=input_price,

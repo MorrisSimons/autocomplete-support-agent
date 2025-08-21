@@ -358,14 +358,38 @@ private callApi = async (text: string, api_upl: string): Promise<string> => {
     }));
     
     // Handle both chat completions and legacy completions formats
+    let fullResponse = "";
     if (isChatApi && responseJson.choices && responseJson.choices[0] && responseJson.choices[0].message) {
-      return responseJson.choices[0].message.content;
+      fullResponse = responseJson.choices[0].message.content;
     } else if (responseJson.choices && responseJson.choices[0] && responseJson.choices[0].text) {
-      return responseJson.choices[0].text;
+      fullResponse = responseJson.choices[0].text;
     } else {
       console.error("Unexpected response format:", responseJson);
       return "";
     }
+    
+    // Log the full response to console (this will show the thinking process)
+    console.log("Full AI Response:", fullResponse);
+    
+    // Extract only the content after <answer> tag
+    let extractedAnswer = "";
+    const answerTagIndex = fullResponse.indexOf("<answer>");
+    if (answerTagIndex !== -1) {
+      extractedAnswer = fullResponse.substring(answerTagIndex + 8); // 8 is the length of "<answer>"
+      // Remove any trailing tags or extra content
+      const endTagIndex = extractedAnswer.indexOf("</answer>");
+      if (endTagIndex !== -1) {
+        extractedAnswer = extractedAnswer.substring(0, endTagIndex);
+      }
+    } else {
+      // If no <answer> tag found, return the full response
+      extractedAnswer = fullResponse;
+    }
+    
+    // Log the extracted answer for debugging
+    console.log("Extracted Answer:", extractedAnswer);
+    
+    return extractedAnswer;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
       return "";  // Return empty string if request was aborted
