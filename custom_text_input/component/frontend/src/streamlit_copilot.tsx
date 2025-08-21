@@ -244,19 +244,24 @@ private callApi = async (text: string, api_upl: string): Promise<string> => {
   const {prompt_template, api_url, api_key, height, fontFamily, border, ...model_kwargs} = this.props.args;
   const prompt = prompt_template.replace("{text}", text); // format the prompt
   
-  // Check if this is a Groq API call (chat completions format)
-  const isGroq = api_upl.includes('groq.com') || api_upl.includes('openai/v1/chat/completions');
-  
+  // Generalize to support both chat and legacy completions APIs, not just Groq
+  // Determine if the API expects chat format (messages) or legacy format (prompt)
+  // Use a prop or model_kwargs to allow user to specify the format, fallback to auto-detect
+  const isChatApi = (
+    this.props.args["api_format"] === "chat" ||
+    api_upl.includes('/chat/completions')
+  );
+
   let payload;
-  if (isGroq) {
-    // Use chat completions format for Groq - only include valid parameters
+  if (isChatApi) {
+    // Use chat completions format for any compatible API
     const validParams: any = {};
     if (model_kwargs.model) validParams.model = model_kwargs.model;
     if (model_kwargs.max_tokens) validParams.max_tokens = model_kwargs.max_tokens;
     if (model_kwargs.temperature) validParams.temperature = model_kwargs.temperature;
     if (model_kwargs.top_p) validParams.top_p = model_kwargs.top_p;
     if (model_kwargs.stop) validParams.stop = model_kwargs.stop;
-    
+
     payload = {
       messages: [
         {
@@ -318,7 +323,7 @@ private callApi = async (text: string, api_upl: string): Promise<string> => {
     const responseJson = await response.json();
     
     // Handle both chat completions and legacy completions formats
-    if (isGroq && responseJson.choices && responseJson.choices[0] && responseJson.choices[0].message) {
+    if (isChatApi && responseJson.choices && responseJson.choices[0] && responseJson.choices[0].message) {
       return responseJson.choices[0].message.content;
     } else if (responseJson.choices && responseJson.choices[0] && responseJson.choices[0].text) {
       return responseJson.choices[0].text;

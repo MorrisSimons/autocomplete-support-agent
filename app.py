@@ -18,13 +18,13 @@ groq_client = Groq(api_key=groq_api_key)
 
 # Page configuration
 st.set_page_config(
-    page_title="Lysa customer support Copilot – Smart Support Suggestions",
+    page_title="Customer support Copilot – Smart Support Suggestions",
     layout="wide",
     page_icon="💬"
 )
 
 # Title
-st.title("💬 Lysa Support Agent Tool")
+st.title("💬 Support Agent Tool")
 st.markdown("Smart answer suggestions for customer support agents")
 
 # Create two columns
