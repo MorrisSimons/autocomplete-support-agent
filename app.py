@@ -90,18 +90,20 @@ with col2:
 
 
     user_input = copilot(
-        prompt_template="Help me respond to this customer question: {text}",
+        prompt_template="Complete the following the for the right answer to the questiom: {text}",
         api_url="https://api.groq.com/openai/v1/chat/completions",
         api_key=groq_api_key,
         rpm_limit=50,
         height=400,
         font_family="Arial",
-        model="llama3-8b-8192",
+        model="deepseek-r1-distill-llama-70b",
         max_tokens=100,
         temperature=0.7,
         key="test_custom_component",
         token_cost=input_price,
-        output_token_cost=output_price
+        output_token_cost=output_price,
+        text=selected_q['body'],
+        question_title=selected_q['title']
     )
     
     if user_input:

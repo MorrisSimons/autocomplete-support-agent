@@ -254,8 +254,10 @@ private callApi = async (text: string, api_upl: string): Promise<string> => {
     });
   }
 
-  const {prompt_template, api_url, api_key, height, fontFamily, border, ...model_kwargs} = this.props.args;
-  const prompt = prompt_template.replace("{text}", text); // format the prompt
+  const {prompt_template, api_url, api_key, height, fontFamily, border, text: questionText, question_title, ...model_kwargs} = this.props.args;
+  const prompt = prompt_template
+    .replace("{text}", questionText || "")
+    .replace("{question_title}", question_title || ""); // format the prompt with both placeholders
   
   // Generalize to support both chat and legacy completions APIs, not just Groq
   // Determine if the API expects chat format (messages) or legacy format (prompt)

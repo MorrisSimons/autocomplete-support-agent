@@ -14,7 +14,7 @@ else:
     _copilot = components.declare_component("Copilot", url="http://localhost:3001")
 
 
-def copilot(prompt_template, api_url, api_key=None, rpm_limit=100, height: int = 100, font_family: str = "Helvetica", **model_kwargs):
+def copilot(prompt_template, api_url, api_key=None, rpm_limit=100, height: int = 100, font_family: str = "Helvetica", text=None, question_title=None, **model_kwargs):
     return _copilot(
         prompt_template=prompt_template,
         api_url=api_url,
@@ -22,6 +22,8 @@ def copilot(prompt_template, api_url, api_key=None, rpm_limit=100, height: int =
         rpm_limit=rpm_limit,
         height=height,
         font_family=font_family,
+        text=text,
+        question_title=question_title,
         default=None,
         **model_kwargs,
     )
