@@ -3,7 +3,7 @@
 
 ### GOAL OF REPO
 ##### Personal Goals
-- [ ] Learn how to use Streamlit custom components
+- [x] Learn how to use Streamlit custom components
 - [ ] Learn how to build a autocomplete solution for customer support.
 - [ ] See if i can intergrate tools to a autocomplete solution.
 - [ ] Understand how a autocomplete solution works compared to a normal LLM chatbot. (cost saving streagies)
@@ -34,4 +34,6 @@
 - [x] Handle thinking models (like llama) to hide the thinking process.
 - [x] Make it do a request every 500ms after the user stops typing not every time the user types. to reduce cost.
 - [ ] Give LLM tools to look in knowledge base.
+- [ ] Give it mcp access to supabase.
+- [ ] Make a clean rewrite of the code so the autocomplete can be used in other streamlit projects.
 - [ ] Make this Readme.md better.

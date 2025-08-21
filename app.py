@@ -100,13 +100,7 @@ with col2:
         text=selected_q['body'],
         question_title=selected_q['title']
     )
-    
-    if user_input:
-        st.success("AI Response Generated!")
 
-    else:
-        st.info("Type in the box above to generate an AI response.")
-    
 
 
 # Footer
