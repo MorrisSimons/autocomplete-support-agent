@@ -249,6 +249,158 @@ private onScroll = (): void => {
 
   private abortController = new AbortController();
 
+  // Add tool call execution method
+  private executeToolCalls = async (toolCalls: any[]): Promise<string[]> => {
+    const results: string[] = [];
+    
+    for (const toolCall of toolCalls) {
+      const functionName = toolCall.function?.name;
+      const args = JSON.parse(toolCall.function?.arguments || '{}');
+      
+      console.log(`Executing tool: ${functionName} with args:`, args);
+      
+      if (functionName === 'search_knowledge_base') {
+        // For now, return a mock result since we can't get real-time response
+        // In a real implementation, you'd need to handle the response asynchronously
+        const mockResult = this.getMockToolResult(functionName, args);
+        results.push(mockResult);
+      } else {
+        results.push(`Unknown tool: ${functionName}`);
+      }
+    }
+    
+    return results;
+  }
+
+  // Mock tool results for demonstration
+  private getMockToolResult = (toolName: string, args: any): string => {
+    if (toolName === 'search_knowledge_base') {
+      // Extract query string safely
+      let query = '';
+      if (typeof args.query === 'string') {
+        query = args.query;
+      } else if (args.query && typeof args.query === 'object') {
+        // If query is an object, try to get the value
+        query = args.query.toString() || '';
+      } else {
+        query = String(args.query || '');
+      }
+      
+      const queryLower = query.toLowerCase();
+      console.log(`Processing query: "${query}" (lowercase: "${queryLower}")`);
+      
+      // Simple keyword matching (same as Python backend)
+      if (queryLower.includes('avgifter') || queryLower.includes('fees') || queryLower.includes('kostnad')) {
+        return "Lysa charges 0.4% annually for investment accounts";
+      } else if (queryLower.includes('sparkonto') || queryLower.includes('interest') || queryLower.includes('ränta')) {
+        return "Sparkonto Auto offers 3.5% interest rate";
+      } else if (queryLower.includes('pension')) {
+        return "You can transfer your pension to Lysa with no fees";
+      } else if (queryLower.includes('isk') || queryLower.includes('investment')) {
+        return "ISK accounts have 0.4% annual fee and tax-efficient structure";
+      } else if (queryLower.includes('contact') || queryLower.includes('support') || queryLower.includes('help')) {
+        return "You can contact Lysa support via email at support@lysa.se or call +46 8 123 45 67";
+      } else {
+        return `Searching for: "${query}". Found general information about Lysa services.`;
+      }
+    }
+    
+    return `Mock result for ${toolName}`;
+  }
+
+  // Add follow-up call method for tool results
+  private makeFollowUpCall = async (apiUrl: string, userInput: string, toolResults: string[]): Promise<string> => {
+    const followUpPrompt = `Based on search results: ${toolResults.join('\n')}\n\nComplete: "${userInput}"`;
+    
+    const {prompt_template, api_key, height, fontFamily, border, text: questionText, question_title, ...model_kwargs} = this.props.args;
+    const prompt = prompt_template
+      .replace("{text}", questionText || "")
+      .replace("{question_title}", question_title || "");
+    
+    const isChatApi = (
+      this.props.args["api_format"] === "chat" ||
+      apiUrl.includes('/chat/completions')
+    );
+
+    let payload;
+    if (isChatApi) {
+      const validParams: any = {};
+      if (model_kwargs.model) validParams.model = model_kwargs.model;
+      if (model_kwargs.max_tokens) validParams.max_tokens = model_kwargs.max_tokens;
+      if (model_kwargs.temperature) validParams.temperature = model_kwargs.temperature;
+      if (model_kwargs.top_p) validParams.top_p = model_kwargs.top_p;
+      if (model_kwargs.stop) validParams.stop = model_kwargs.stop;
+
+      payload = {
+        messages: [
+          {
+            role: "user",
+            content: followUpPrompt
+          }
+        ],
+        ...validParams,
+        stream: false
+      };
+    } else {
+      payload = {
+        prompt: followUpPrompt,
+        ...model_kwargs,
+        echo: false
+      };
+    }
+    
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    
+    if (api_key) {
+      headers['Authorization'] = `Bearer ${api_key}`;
+    }
+
+    try {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify(payload),
+        signal: this.abortController.signal
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const responseJson = await response.json();
+      
+      let fullResponse = "";
+      if (isChatApi && responseJson.choices && responseJson.choices[0] && responseJson.choices[0].message) {
+        fullResponse = responseJson.choices[0].message.content;
+      } else if (responseJson.choices && responseJson.choices[0] && responseJson.choices[0].text) {
+        fullResponse = responseJson.choices[0].text;
+      } else {
+        console.error("Unexpected response format:", responseJson);
+        return "";
+      }
+      
+      // Extract answer from response
+      let extractedAnswer = "";
+      const answerTagIndex = fullResponse.indexOf("<answer>");
+      if (answerTagIndex !== -1) {
+        extractedAnswer = fullResponse.substring(answerTagIndex + 8);
+        const endTagIndex = extractedAnswer.indexOf("</answer>");
+        if (endTagIndex !== -1) {
+          extractedAnswer = extractedAnswer.substring(0, endTagIndex);
+        }
+      } else {
+        extractedAnswer = fullResponse;
+      }
+      
+      return extractedAnswer;
+    } catch (error) {
+      console.error("Follow-up call error:", error);
+      return "";
+    }
+  }
+
 private callApi = async (text: string, api_upl: string): Promise<string> => {
   // Abort the previous request
   this.abortController.abort();
@@ -286,6 +438,27 @@ private callApi = async (text: string, api_upl: string): Promise<string> => {
     api_upl.includes('/chat/completions')
   );
 
+  // Define tools for the API call
+  const tools = [
+    {
+      type: "function",
+      function: {
+        name: "search_knowledge_base",
+        description: "Search the Lysa knowledge base for customer support information",
+        parameters: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "Search query to find relevant information"
+            }
+          },
+          required: ["query"]
+        }
+      }
+    }
+  ];
+
   let payload;
   if (isChatApi) {
     // Use chat completions format for any compatible API
@@ -304,6 +477,8 @@ private callApi = async (text: string, api_upl: string): Promise<string> => {
         }
       ],
       ...validParams,
+      tools: tools,
+      tool_choice: "auto",
       stream: false
     };
   } else {
@@ -378,8 +553,11 @@ private callApi = async (text: string, api_upl: string): Promise<string> => {
     
     // Handle both chat completions and legacy completions formats
     let fullResponse = "";
+    let message = null;
+    
     if (isChatApi && responseJson.choices && responseJson.choices[0] && responseJson.choices[0].message) {
-      fullResponse = responseJson.choices[0].message.content;
+      message = responseJson.choices[0].message;
+      fullResponse = message.content || "";
     } else if (responseJson.choices && responseJson.choices[0] && responseJson.choices[0].text) {
       fullResponse = responseJson.choices[0].text;
     } else {
@@ -389,6 +567,19 @@ private callApi = async (text: string, api_upl: string): Promise<string> => {
     
     // Log the full response to console (this will show the thinking process)
     console.log("Full AI Response:", fullResponse);
+    
+    // Check if there are tool calls
+    if (isChatApi && message && message.tool_calls && message.tool_calls.length > 0) {
+      console.log("Tool calls detected:", message.tool_calls);
+      
+      // Execute the tool calls
+      const toolResults = await this.executeToolCalls(message.tool_calls);
+      console.log("Tool execution results:", toolResults);
+      
+      // Make a follow-up call with the tool results
+      const finalResponse = await this.makeFollowUpCall(api_upl, text, toolResults);
+      return finalResponse;
+    }
     
     // Extract only the content after <answer> tag
     let extractedAnswer = "";
