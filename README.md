@@ -32,5 +32,6 @@
 - [x] add cost calculator.
 - [x] Give the LLM access to the question we want to answer.
 - [x] Handle thinking models (like llama) to hide the thinking process.
+- [x] Make it do a request every 500ms after the user stops typing not every time the user types. to reduce cost.
 - [ ] Give LLM tools to look in knowledge base.
 - [ ] Make this Readme.md better.

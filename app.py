@@ -79,15 +79,10 @@ with col1:
 
 with col2:
     st.subheader("✍️ Custom Component Test")
-    col3, col4 = st.columns(2)
-    with col3:
-        input_price = st.number_input("Input price per 1M tokens ($)", value=0.05, step=0.01)
-        input_tokens = st.number_input("Input tokens", value=1000, step=100)
-        
-    with col4:
-        output_price = st.number_input("Output price per 1M tokens ($)", value=0.10, step=0.01)
-        output_tokens = st.number_input("Output tokens", value=500, step=100)
-
+    
+    # Define price inputs outside column blocks for accessibility
+    input_price = st.number_input("Input price per 1M tokens ($)", value=0.05, step=0.01)
+    output_price = st.number_input("Output price per 1M tokens ($)", value=0.10, step=0.01)
 
     user_input = copilot(
         prompt_template="[SYSTEM] You are a autocomplte for Lysa customer support. Thinking short with as few words as possible and always use <answer> tags for your final response.\n\nCustomer Question Title: {question_title}\n\nCustomer Question Details: {text}\n\nProvide a helpful response using <answer> tags:\n<answer>\nYour response here...\n</answer>",

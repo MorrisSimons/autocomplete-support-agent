@@ -18,6 +18,7 @@ interface State {
   inputCost: number
   outputCost: number
   totalCost: number
+  debounceTimer: number | null
 }
 
 class Copilot extends StreamlitComponentBase<State> {
@@ -36,7 +37,8 @@ class Copilot extends StreamlitComponentBase<State> {
     failedRequests: 0,
     inputCost: 0,
     outputCost: 0,
-    totalCost: 0
+    totalCost: 0,
+    debounceTimer: null
   }
 
   public render = (): ReactNode => {
@@ -171,18 +173,28 @@ private onScroll = (): void => {
     this.forceUpdate();
   }
   private onChange = (event: React.ChangeEvent<HTMLTextAreaElement>): void => {
-  const text = event.target.value
-  const api_upl = this.props.args["api_url"]
-  this.setState({ text, suggestion: "" }, () => {
-    if (text.trim() !== "") {
-      this.callApi(text, api_upl).then(suggestion => {
-         if (this.state.text.trim() !== "") {
-          this.setState({ suggestion: this.state.text + suggestion })
-        }
-      })
+    const text = event.target.value
+    this.setState({ text, suggestion: "" })
+    
+    // Clear any existing timer
+    if (this.state.debounceTimer !== null) {
+      window.clearTimeout(this.state.debounceTimer!)
     }
-  })
-}
+    
+    // Set a new debounced timer (500ms delay)
+    const timer = window.setTimeout(() => {
+      if (text.trim() !== "") {
+        const api_upl = this.props.args["api_url"]
+        this.callApi(text, api_upl).then(suggestion => {
+          if (this.state.text.trim() !== "") {
+            this.setState({ suggestion: this.state.text + suggestion })
+          }
+        })
+      }
+    }, 500) // Wait 500ms after user stops typing
+    
+    this.setState({ debounceTimer: timer })
+  }
 
 
   private onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -226,6 +238,13 @@ private onScroll = (): void => {
       outputCost: 0,
       totalCost: 0
     });
+  }
+
+  // Cleanup timer when component unmounts
+  componentWillUnmount(): void {
+    if (this.state.debounceTimer !== null) {
+      window.clearTimeout(this.state.debounceTimer!)
+    }
   }
 
   private abortController = new AbortController();
