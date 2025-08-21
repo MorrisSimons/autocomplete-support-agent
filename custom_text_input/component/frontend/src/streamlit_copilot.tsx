@@ -15,6 +15,9 @@ interface State {
   totalRequests: number
   successfulRequests: number
   failedRequests: number
+  inputCost: number
+  outputCost: number
+  totalCost: number
 }
 
 class Copilot extends StreamlitComponentBase<State> {
@@ -30,7 +33,10 @@ class Copilot extends StreamlitComponentBase<State> {
     currentMinute: Math.floor(Date.now() / 60000),
     totalRequests: 0,
     successfulRequests: 0,
-    failedRequests: 0
+    failedRequests: 0,
+    inputCost: 0,
+    outputCost: 0,
+    totalCost: 0
   }
 
   public render = (): ReactNode => {
@@ -50,7 +56,7 @@ class Copilot extends StreamlitComponentBase<State> {
         <div>
           {/* Request Counter Display */}
           <div style={{
-            fontSize: '0.8em',
+            fontSize: '1em',
             color: theme.textColor,
             marginBottom: '0.5em',
             padding: '0.5em',
@@ -66,7 +72,11 @@ class Copilot extends StreamlitComponentBase<State> {
               ✅ Success: {this.state.successfulRequests} | 
               ❌ Failed: {this.state.failedRequests} | 
               {/* Shows how many API requests have been made in the current minute, out of the allowed requests per minute (RPM) limit */}
-              Requests this per minute / limit: {this.state.requestsThisMinute} / {this.props.args["rpm_limit"]}
+              Requests this per minute / limit: {this.state.requestsThisMinute} / {this.props.args["rpm_limit"]} 
+              <br />
+              <strong>Cost:</strong> Input: ${this.state.inputCost.toFixed(6)} | Output: ${this.state.outputCost.toFixed(6)} | Total: ${this.state.totalCost.toFixed(6)}
+              
+              
             </div>
             <button
               onClick={this.resetCounters}
@@ -176,7 +186,7 @@ private onScroll = (): void => {
 
 
   private onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
-  if (event.key === 'Enter') {
+  if (event.key === 'Tab') {
     event.preventDefault()
     this.setState(prevState => ({
       text: prevState.suggestion,
@@ -211,7 +221,10 @@ private onScroll = (): void => {
       totalRequests: 0,
       successfulRequests: 0,
       failedRequests: 0,
-      requestsThisMinute: 0
+      requestsThisMinute: 0,
+      inputCost: 0,
+      outputCost: 0,
+      totalCost: 0
     });
   }
 
@@ -321,6 +334,26 @@ private callApi = async (text: string, api_upl: string): Promise<string> => {
     }));
 
     const responseJson = await response.json();
+    
+    // Calculate costs based on token usage
+    const inputTokens = responseJson.usage?.prompt_tokens || 0;
+    const outputTokens = responseJson.usage?.completion_tokens || 0;
+    
+    const inputPrice = this.props.args["token_cost"] || 0.05;
+    const outputPrice = this.props.args["output_token_cost"] || 0.10;
+    
+    // If no usage info, estimate based on text length (rough approximation)
+    const estimatedInputTokens = inputTokens || Math.ceil(prompt.length / 4);
+    const estimatedOutputTokens = outputTokens || 0;
+    
+    const newInputCost = (estimatedInputTokens / 1_000_000) * inputPrice;
+    const newOutputCost = (estimatedOutputTokens / 1_000_000) * outputPrice;
+    
+    this.setState(prevState => ({
+      inputCost: prevState.inputCost + newInputCost,
+      outputCost: prevState.outputCost + newOutputCost,
+      totalCost: prevState.totalCost + newInputCost + newOutputCost
+    }));
     
     // Handle both chat completions and legacy completions formats
     if (isChatApi && responseJson.choices && responseJson.choices[0] && responseJson.choices[0].message) {

@@ -79,7 +79,16 @@ with col1:
 
 with col2:
     st.subheader("✍️ Custom Component Test")
-    
+    col3, col4 = st.columns(2)
+    with col3:
+        input_price = st.number_input("Input price per 1M tokens ($)", value=0.05, step=0.01)
+        input_tokens = st.number_input("Input tokens", value=1000, step=100)
+        
+    with col4:
+        output_price = st.number_input("Output price per 1M tokens ($)", value=0.10, step=0.01)
+        output_tokens = st.number_input("Output tokens", value=500, step=100)
+
+
     user_input = copilot(
         prompt_template="Help me respond to this customer question: {text}",
         api_url="https://api.groq.com/openai/v1/chat/completions",
@@ -88,9 +97,11 @@ with col2:
         height=400,
         font_family="Arial",
         model="llama3-8b-8192",
-        max_tokens=200,
+        max_tokens=100,
         temperature=0.7,
-        key="test_custom_component"
+        key="test_custom_component",
+        token_cost=input_price,
+        output_token_cost=output_price
     )
     
     if user_input:
@@ -99,6 +110,8 @@ with col2:
     else:
         st.info("Type in the box above to generate an AI response.")
     
+
+
 # Footer
 st.markdown("---")
 st.markdown("*Built for Lysa Customer Support Team*")
