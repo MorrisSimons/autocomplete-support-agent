@@ -261,9 +261,14 @@ class Copilot extends StreamlitComponentBase<State> {
       console.log(`Executing tool: ${functionName} with args:`, args);
       
       if (functionName === 'search_knowledge_base') {
-        // Execute the real Pinecone search tool
+        // Execute the real Pinecone search tool with enhanced source info
         const toolResult = await this.executeTool(functionName, args);
-        results.push(toolResult);
+        
+        // Add source context to the result
+        const searchQuery = args.query || 'unknown query';
+        const enhancedResult = `Search Query: "${searchQuery}"\n\n${toolResult}\n\nSource: Information retrieved from Lysa's knowledge base via Pinecone vector search.`;
+        
+        results.push(enhancedResult);
       } else {
         results.push(`Unknown tool: ${functionName}`);
       }
@@ -645,7 +650,39 @@ private callApi = async (text: string, api_upl: string): Promise<string> => {
       
       // Make a follow-up call with the tool results
       const finalResponse = await this.makeFollowUpCall(api_upl, text, toolResults);
-      return finalResponse;
+      
+      // Extract answer from the follow-up response
+      let extractedAnswer = "";
+      const answerTagIndex = finalResponse.indexOf("<answer>");
+      if (answerTagIndex !== -1) {
+        extractedAnswer = finalResponse.substring(answerTagIndex + 8);
+        const endTagIndex = extractedAnswer.indexOf("</answer>");
+        if (endTagIndex !== -1) {
+          extractedAnswer = extractedAnswer.substring(0, endTagIndex);
+        }
+      } else {
+        // If no <answer> tags, try to find content after <think> tags or return clean response
+        const thinkTagIndex = finalResponse.indexOf("<think>");
+        if (thinkTagIndex !== -1) {
+          const endThinkIndex = finalResponse.indexOf("</think>");
+          if (endThinkIndex !== -1) {
+            // Extract content after </think> tag
+            extractedAnswer = finalResponse.substring(endThinkIndex + 8).trim();
+          } else {
+            // No closing </think> tag, take everything after <think>
+            extractedAnswer = finalResponse.substring(thinkTagIndex + 7).trim();
+          }
+        } else {
+          // No tags found, return the full response
+          extractedAnswer = finalResponse;
+        }
+      }
+      
+      // Clean up the extracted answer
+      extractedAnswer = extractedAnswer.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+      
+      console.log("Extracted Answer from follow-up:", extractedAnswer);
+      return extractedAnswer;
     }
     
     // Extract only the content after <answer> tag

@@ -126,13 +126,13 @@ with col2:
     output_price = st.number_input("Output price per 1M tokens ($)", value=0.10, step=0.01)
 
     user_input = copilot(
-        prompt_template="[SYSTEM] Du är en autokompletteringsassistent för Lysa kundsupport. Du har tillgång till ett kunskapsbas-verktyg för att söka efter korrekt information. Använd alltid verktyg när du behöver specifik information om avgifter, räntor, policys osv. Använd <answer>-taggar för ditt slutgiltiga svar.\n\nKundfrågans titel: {question_title}\n\nKundfrågans detaljer: {text}\n\nOm du behöver specifik information, använd verktyget search_knowledge_base. Ge sedan ett hjälpsamt svar inom <answer>-taggar:\n<answer>\nDitt svar här...\n</answer>",
+        prompt_template="[SYSTEM] You are an autocomplete assistant for Lysa customer support. You have access to a knowledge base tool to search for accurate information. Always use tools when you need specific information about fees, rates, policies, etc. IMPORTANT: Provide your final response ONLY within <answer> tags. Do NOT include <think> tags or internal reasoning in your final response. ALWAYS include a source reference at the end of your response indicating where the information came from.\n\nCustomer Question Title: {question_title}\n\nCustomer Question Details: {text}\n\nIf you need specific information, use the search_knowledge_base tool. Then provide a helpful response using ONLY <answer> tags. Include a source reference at the end:\n<answer>\nYour response here...\n\n IMPORTANT: ADD THE SOURCE REFERENCE AT THE END OF YOUR RESPONSE FROM THE SEARCH RESPONSE YOU GOT FROM THE TOOL.\n</answer>",
         api_url="https://api.groq.com/openai/v1/chat/completions",
         api_key=groq_api_key,
         rpm_limit=50,
         height=400,
         font_family="Arial",
-        model="deepseek-r1-distill-llama-70b",
+        model="meta-llama/llama-4-scout-17b-16e-instruct",
         max_tokens=400,
         temperature=0.7,
         key="test_custom_component",
