@@ -38,7 +38,7 @@ class Copilot extends StreamlitComponentBase<State> {
     inputCost: 0,
     outputCost: 0,
     totalCost: 0,
-    debounceTimer: null
+    debounceTimer: null,
   }
 
   public render = (): ReactNode => {
@@ -169,7 +169,8 @@ class Copilot extends StreamlitComponentBase<State> {
     this.suggestionTextarea.scrollTop = this.userTextarea.scrollTop;
   }
 }
-private onScroll = (): void => {
+
+  private onScroll = (): void => {
     this.forceUpdate();
   }
   private onChange = (event: React.ChangeEvent<HTMLTextAreaElement>): void => {
@@ -260,10 +261,9 @@ private onScroll = (): void => {
       console.log(`Executing tool: ${functionName} with args:`, args);
       
       if (functionName === 'search_knowledge_base') {
-        // For now, return a mock result since we can't get real-time response
-        // In a real implementation, you'd need to handle the response asynchronously
-        const mockResult = this.getMockToolResult(functionName, args);
-        results.push(mockResult);
+        // Execute the real Pinecone search tool
+        const toolResult = await this.executeTool(functionName, args);
+        results.push(toolResult);
       } else {
         results.push(`Unknown tool: ${functionName}`);
       }
@@ -272,8 +272,8 @@ private onScroll = (): void => {
     return results;
   }
 
-  // Mock tool results for demonstration
-  private getMockToolResult = (toolName: string, args: any): string => {
+  // Real Pinecone search tool results
+  private executeTool = async (toolName: string, args: any): Promise<string> => {
     if (toolName === 'search_knowledge_base') {
       // Extract query string safely
       let query = '';
@@ -286,26 +286,93 @@ private onScroll = (): void => {
         query = String(args.query || '');
       }
       
-      const queryLower = query.toLowerCase();
-      console.log(`Processing query: "${query}" (lowercase: "${queryLower}")`);
+      console.log(`Processing query: "${query}"`);
       
-      // Simple keyword matching (same as Python backend)
-      if (queryLower.includes('avgifter') || queryLower.includes('fees') || queryLower.includes('kostnad')) {
-        return "Lysa charges 0.4% annually for investment accounts";
-      } else if (queryLower.includes('sparkonto') || queryLower.includes('interest') || queryLower.includes('ränta')) {
-        return "Sparkonto Auto offers 3.5% interest rate";
-      } else if (queryLower.includes('pension')) {
-        return "You can transfer your pension to Lysa with no fees";
-      } else if (queryLower.includes('isk') || queryLower.includes('investment')) {
-        return "ISK accounts have 0.4% annual fee and tax-efficient structure";
-      } else if (queryLower.includes('contact') || queryLower.includes('support') || queryLower.includes('help')) {
-        return "You can contact Lysa support via email at support@lysa.se or call +46 8 123 45 67";
-      } else {
-        return `Searching for: "${query}". Found general information about Lysa services.`;
+      // Use real Pinecone search if credentials are available
+      const pineconeApiKey = this.props.args["pinecone_api_key"];
+      const pineconeIndexName = this.props.args["pinecone_index_name"];
+      const openaiApiKey = this.props.args["openai_api_key"];
+      
+      if (pineconeApiKey && pineconeIndexName && openaiApiKey) {
+        try {
+          // Generate embedding using OpenAI REST API
+          const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openaiApiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: this.props.args["embedding_model"] || "text-embedding-ada-002",
+              input: query
+            })
+          });
+          
+          if (!embeddingResponse.ok) {
+            throw new Error(`OpenAI API error: ${embeddingResponse.status}`);
+          }
+          
+          const embeddingData = await embeddingResponse.json();
+          const queryEmbedding = embeddingData.data[0].embedding;
+          
+          // Search Pinecone using REST API
+          const pineconeEnvironment = this.props.args["pinecone_environment"];
+          const pineconeHost = this.props.args["pinecone_host"] || "https://api.pinecone.io";
+          
+          // Construct the correct Pinecone query endpoint
+          let indexUrl;
+          if (pineconeHost.includes('svc.') && pineconeHost.includes('.pinecone.io')) {
+            // If pinecone_host already contains the full index URL, use it directly
+            indexUrl = `https://${pineconeHost}/query`;
+          } else {
+            // Otherwise, construct the standard Pinecone API URL
+            indexUrl = `${pineconeHost}/indexes/${pineconeIndexName}/query`;
+          }
+          
+          console.log(`Pinecone query URL: ${indexUrl}`);
+          
+          const searchResponse = await fetch(indexUrl, {
+            method: 'POST',
+            headers: {
+              'Api-Key': pineconeApiKey,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              vector: queryEmbedding,
+              topK: this.props.args["search_top"] || 3,
+              includeMetadata: true
+            })
+          });
+          
+          if (!searchResponse.ok) {
+            throw new Error(`Pinecone API error: ${searchResponse.status}`);
+          }
+          
+          const searchData = await searchResponse.json();
+          
+          if (searchData.matches && searchData.matches.length > 0) {
+            const results = searchData.matches
+              .map((match: any) => match.metadata?.text || match.metadata?.content || 'No content')
+              .filter((text: any) => text !== 'No content');
+            
+            if (results.length > 0) {
+              return `Found ${results.length} relevant results:\n${results.join('\n\n')}`;
+            }
+          }
+          
+          // No results found
+          return "";
+        } catch (error) {
+          console.error("Pinecone search error:", error);
+          return "";
+        }
       }
+      
+      // No credentials available
+      return "";
     }
     
-    return `Mock result for ${toolName}`;
+    return "";
   }
 
   // Add follow-up call method for tool results
@@ -438,19 +505,19 @@ private callApi = async (text: string, api_upl: string): Promise<string> => {
     api_upl.includes('/chat/completions')
   );
 
-  // Define tools for the API call
+  // Definiera verktyg för API-anropet
   const tools = [
     {
       type: "function",
       function: {
         name: "search_knowledge_base",
-        description: "Search the Lysa knowledge base for customer support information",
+        description: "Sök i Lysas kunskapsbas efter information för kundsupport",
         parameters: {
           type: "object",
           properties: {
             query: {
               type: "string",
-              description: "Search query to find relevant information"
+              description: "Sökfråga för att hitta relevant information"
             }
           },
           required: ["query"]
