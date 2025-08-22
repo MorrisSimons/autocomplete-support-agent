@@ -38,7 +38,7 @@ class Copilot extends StreamlitComponentBase<State> {
     inputCost: 0,
     outputCost: 0,
     totalCost: 0,
-    debounceTimer: null
+    debounceTimer: null,
   }
 
   public render = (): ReactNode => {
@@ -169,7 +169,8 @@ class Copilot extends StreamlitComponentBase<State> {
     this.suggestionTextarea.scrollTop = this.userTextarea.scrollTop;
   }
 }
-private onScroll = (): void => {
+
+  private onScroll = (): void => {
     this.forceUpdate();
   }
   private onChange = (event: React.ChangeEvent<HTMLTextAreaElement>): void => {
@@ -249,6 +250,241 @@ private onScroll = (): void => {
 
   private abortController = new AbortController();
 
+  // Add tool call execution method
+  private executeToolCalls = async (toolCalls: any[]): Promise<string[]> => {
+    const results: string[] = [];
+    
+    for (const toolCall of toolCalls) {
+      const functionName = toolCall.function?.name;
+      const args = JSON.parse(toolCall.function?.arguments || '{}');
+      
+      console.log(`Executing tool: ${functionName} with args:`, args);
+      
+      if (functionName === 'search_knowledge_base') {
+        // Execute the real Pinecone search tool with enhanced source info
+        const toolResult = await this.executeTool(functionName, args);
+        
+        // Add source context to the result
+        const searchQuery = args.query || 'unknown query';
+        const enhancedResult = `Search Query: "${searchQuery}"\n\n${toolResult}\n\nSource: Information retrieved from Lysa's knowledge base via Pinecone vector search.`;
+        
+        results.push(enhancedResult);
+      } else {
+        results.push(`Unknown tool: ${functionName}`);
+      }
+    }
+    
+    return results;
+  }
+
+  // Real Pinecone search tool results
+  private executeTool = async (toolName: string, args: any): Promise<string> => {
+    if (toolName === 'search_knowledge_base') {
+      // Extract query string safely
+      let query = '';
+      if (typeof args.query === 'string') {
+        query = args.query;
+      } else if (args.query && typeof args.query === 'object') {
+        // If query is an object, try to get the value
+        query = args.query.toString() || '';
+      } else {
+        query = String(args.query || '');
+      }
+      
+      console.log(`Processing query: "${query}"`);
+      
+      // Use real Pinecone search if credentials are available
+      const pineconeApiKey = this.props.args["pinecone_api_key"];
+      const pineconeIndexName = this.props.args["pinecone_index_name"];
+      const openaiApiKey = this.props.args["openai_api_key"];
+      
+      if (pineconeApiKey && pineconeIndexName && openaiApiKey) {
+        try {
+          // Generate embedding using OpenAI REST API
+          const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openaiApiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: this.props.args["embedding_model"] || "text-embedding-ada-002",
+              input: query
+            })
+          });
+          
+          if (!embeddingResponse.ok) {
+            throw new Error(`OpenAI API error: ${embeddingResponse.status}`);
+          }
+          
+          const embeddingData = await embeddingResponse.json();
+          const queryEmbedding = embeddingData.data[0].embedding;
+          
+          // Search Pinecone using REST API
+          const pineconeEnvironment = this.props.args["pinecone_environment"];
+          const pineconeHost = this.props.args["pinecone_host"] || "https://api.pinecone.io";
+          
+          // Construct the correct Pinecone query endpoint
+          let indexUrl;
+          if (pineconeHost.includes('svc.') && pineconeHost.includes('.pinecone.io')) {
+            // If pinecone_host already contains the full index URL, use it directly
+            indexUrl = `https://${pineconeHost}/query`;
+          } else {
+            // Otherwise, construct the standard Pinecone API URL
+            indexUrl = `${pineconeHost}/indexes/${pineconeIndexName}/query`;
+          }
+          
+          console.log(`Pinecone query URL: ${indexUrl}`);
+          
+          const searchResponse = await fetch(indexUrl, {
+            method: 'POST',
+            headers: {
+              'Api-Key': pineconeApiKey,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              vector: queryEmbedding,
+              topK: this.props.args["search_top"] || 3,
+              includeMetadata: true
+            })
+          });
+          
+          if (!searchResponse.ok) {
+            throw new Error(`Pinecone API error: ${searchResponse.status}`);
+          }
+          
+          const searchData = await searchResponse.json();
+          
+          if (searchData.matches && searchData.matches.length > 0) {
+            const results = searchData.matches
+              .map((match: any) => ({
+                title: match.metadata?.title || 'No title',
+                source: match.metadata?.source || 'No source',
+                text: match.metadata?.text || match.metadata?.content || 'No content'
+              }))
+              .filter((result: any) => result.text !== 'No content');
+            
+            if (results.length > 0) {
+              console.log("Found results:", results);
+              return JSON.stringify({
+                count: results.length,
+                results: results
+              }, null, 2);
+            }
+            
+          }
+          
+          // No results found
+          return "";
+        } catch (error) {
+          console.error("Pinecone search error:", error);
+          return "";
+        }
+      }
+      
+      // No credentials available
+      return "";
+    }
+    
+    return "";
+  }
+
+  // Add follow-up call method for tool results
+  private makeFollowUpCall = async (apiUrl: string, userInput: string, toolResults: string[]): Promise<string> => {
+    const followUpPrompt = `Based on the following search results from Lysa's knowledge base, please provide a helpful response to the customer question.\n\nSearch Results:\n${toolResults.join('\n\n')}\n\nCustomer Question: "${userInput}"\n\nPlease provide a comprehensive answer based on the search results above. Include source references where appropriate.`;
+    
+    const {prompt_template, api_key, height, fontFamily, border, text: questionText, question_title, ...model_kwargs} = this.props.args;
+    const prompt = prompt_template
+      .replace("{text}", questionText || "")
+      .replace("{question_title}", question_title || "");
+    
+    const isChatApi = (
+      this.props.args["api_format"] === "chat" ||
+      apiUrl.includes('/chat/completions')
+    );
+    
+    // Create a new abort controller for the follow-up call to avoid conflicts
+    const followUpAbortController = new AbortController();
+
+    let payload;
+    if (isChatApi) {
+      const validParams: any = {};
+      if (model_kwargs.model) validParams.model = model_kwargs.model;
+      if (model_kwargs.max_tokens) validParams.max_tokens = model_kwargs.max_tokens;
+      if (model_kwargs.temperature) validParams.temperature = model_kwargs.temperature;
+      if (model_kwargs.top_p) validParams.top_p = model_kwargs.top_p;
+      if (model_kwargs.stop) validParams.stop = model_kwargs.stop;
+
+      payload = {
+        messages: [
+          {
+            role: "user",
+            content: followUpPrompt
+          }
+        ],
+        ...validParams,
+        stream: false
+      };
+    } else {
+      payload = {
+        prompt: followUpPrompt,
+        ...model_kwargs,
+        echo: false
+      };
+    }
+    
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    
+    if (api_key) {
+      headers['Authorization'] = `Bearer ${api_key}`;
+    }
+
+    try {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify(payload),
+        signal: followUpAbortController.signal
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const responseJson = await response.json();
+      
+      let fullResponse = "";
+      if (isChatApi && responseJson.choices && responseJson.choices[0] && responseJson.choices[0].message) {
+        fullResponse = responseJson.choices[0].message.content;
+      } else if (responseJson.choices && responseJson.choices[0] && responseJson.choices[0].text) {
+        fullResponse = responseJson.choices[0].text;
+      } else {
+        console.error("Unexpected response format:", responseJson);
+        return "";
+      }
+      
+      // Extract answer from response
+      let extractedAnswer = "";
+      const answerTagIndex = fullResponse.indexOf("<answer>");
+      if (answerTagIndex !== -1) {
+        extractedAnswer = fullResponse.substring(answerTagIndex + 8);
+        const endTagIndex = extractedAnswer.indexOf("</answer>");
+        if (endTagIndex !== -1) {
+          extractedAnswer = extractedAnswer.substring(0, endTagIndex);
+        }
+      } else {
+        extractedAnswer = fullResponse;
+      }
+      
+      return extractedAnswer;
+    } catch (error) {
+      console.error("Follow-up call error:", error);
+      return "";
+    }
+  }
+
 private callApi = async (text: string, api_upl: string): Promise<string> => {
   // Abort the previous request
   this.abortController.abort();
@@ -286,6 +522,27 @@ private callApi = async (text: string, api_upl: string): Promise<string> => {
     api_upl.includes('/chat/completions')
   );
 
+  // Definiera verktyg för API-anropet
+  const tools = [
+    {
+      type: "function",
+      function: {
+        name: "search_knowledge_base",
+        description: "Sök i Lysas kunskapsbas efter information för kundsupport",
+        parameters: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "Sökfråga för att hitta relevant information"
+            }
+          },
+          required: ["query"]
+        }
+      }
+    }
+  ];
+
   let payload;
   if (isChatApi) {
     // Use chat completions format for any compatible API
@@ -304,6 +561,8 @@ private callApi = async (text: string, api_upl: string): Promise<string> => {
         }
       ],
       ...validParams,
+      tools: tools,
+      tool_choice: "auto",
       stream: false
     };
   } else {
@@ -378,8 +637,11 @@ private callApi = async (text: string, api_upl: string): Promise<string> => {
     
     // Handle both chat completions and legacy completions formats
     let fullResponse = "";
+    let message = null;
+    
     if (isChatApi && responseJson.choices && responseJson.choices[0] && responseJson.choices[0].message) {
-      fullResponse = responseJson.choices[0].message.content;
+      message = responseJson.choices[0].message;
+      fullResponse = message.content || "";
     } else if (responseJson.choices && responseJson.choices[0] && responseJson.choices[0].text) {
       fullResponse = responseJson.choices[0].text;
     } else {
@@ -389,6 +651,51 @@ private callApi = async (text: string, api_upl: string): Promise<string> => {
     
     // Log the full response to console (this will show the thinking process)
     console.log("Full AI Response:", fullResponse);
+    
+    // Check if there are tool calls
+    if (isChatApi && message && message.tool_calls && message.tool_calls.length > 0) {
+      console.log("Tool calls detected:", message.tool_calls);
+      
+      // Execute the tool calls
+      const toolResults = await this.executeToolCalls(message.tool_calls);
+      console.log("Tool execution results:", toolResults);
+      
+      // Make a follow-up call with the tool results
+      const finalResponse = await this.makeFollowUpCall(api_upl, text, toolResults);
+      
+      // Extract answer from the follow-up response
+      let extractedAnswer = "";
+      const answerTagIndex = finalResponse.indexOf("<answer>");
+      if (answerTagIndex !== -1) {
+        extractedAnswer = finalResponse.substring(answerTagIndex + 8);
+        const endTagIndex = extractedAnswer.indexOf("</answer>");
+        if (endTagIndex !== -1) {
+          extractedAnswer = extractedAnswer.substring(0, endTagIndex);
+        }
+      } else {
+        // If no <answer> tags, try to find content after <think> tags or return clean response
+        const thinkTagIndex = finalResponse.indexOf("<think>");
+        if (thinkTagIndex !== -1) {
+          const endThinkIndex = finalResponse.indexOf("</think>");
+          if (endThinkIndex !== -1) {
+            // Extract content after </think> tag
+            extractedAnswer = finalResponse.substring(endThinkIndex + 8).trim();
+          } else {
+            // No closing </think> tag, take everything after <think>
+            extractedAnswer = finalResponse.substring(thinkTagIndex + 7).trim();
+          }
+        } else {
+          // No tags found, return the full response
+          extractedAnswer = finalResponse;
+        }
+      }
+      
+      // Clean up the extracted answer
+      extractedAnswer = extractedAnswer.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+      
+      console.log("Extracted Answer from follow-up:", extractedAnswer);
+      return extractedAnswer;
+    }
     
     // Extract only the content after <answer> tag
     let extractedAnswer = "";

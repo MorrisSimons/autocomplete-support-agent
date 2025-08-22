@@ -14,7 +14,48 @@ if not groq_api_key:
     st.error("❌ GROQ_API_KEY environment variable not found. Please set it in your .env file.")
     st.stop()
 
+# Load Pinecone credentials
+pinecone_api_key = os.getenv("PINECONE_API_KEY")
+pinecone_environment = os.getenv("PINECONE_ENVIRONMENT")
+pinecone_index_name = os.getenv("PINECONE_INDEX_NAME")
+pinecone_host = os.getenv("PINECONE_HOST")
+openai_api_key = os.getenv("OPENAI_API_KEY")
+embedding_model = os.getenv("EMBEDDING_MODEL", "text-embedding-ada-002")
+search_top = int(os.getenv("SEARCHTOP", "3"))
+
+if not pinecone_api_key:
+    st.warning("⚠️ PINECONE_API_KEY not found. Pinecone search will use fallback keyword matching.")
+
+if not openai_api_key:
+    st.warning("⚠️ OPENAI_API_KEY not found. Pinecone search will use fallback keyword matching.")
+
 groq_client = Groq(api_key=groq_api_key)
+
+# Simple tool class for demonstration
+class VectorSearchTool:
+    def __init__(self):
+        # For now, just return mock data
+        # Later this can be connected to your actual vector database
+        self.mock_knowledge_base = {
+            "fees": "Lysa charges 0.4% annually for investment accounts",
+            "sparkonto": "Sparkonto Auto offers 3.5% interest rate",
+            "pension": "You can transfer your pension to Lysa with no fees",
+            "security": "Lysa is under Finansinspektionen supervision"
+        }
+    
+    def search(self, query: str) -> str:
+        """Simple search function - replace with actual vector search later"""
+        query_lower = query.lower()
+        
+        # Simple keyword matching for demo
+        for key, value in self.mock_knowledge_base.items():
+            if key in query_lower or any(word in query_lower for word in key.split()):
+                return value
+        
+        return f"Searching for: {query}. No specific information found in knowledge base."
+
+# Initialize the tool
+knowledge_tool = VectorSearchTool()
 
 # Page configuration
 st.set_page_config(
@@ -85,24 +126,29 @@ with col2:
     output_price = st.number_input("Output price per 1M tokens ($)", value=0.10, step=0.01)
 
     user_input = copilot(
-        prompt_template="[SYSTEM] You are a autocomplte for Lysa customer support. Thinking short with as few words as possible and always use <answer> tags for your final response.\n\nCustomer Question Title: {question_title}\n\nCustomer Question Details: {text}\n\nProvide a helpful response using <answer> tags:\n<answer>\nYour response here...\n</answer>",
+        prompt_template="[SYSTEM] You are an autocomplete assistant for Lysa customer support. You have access to a knowledge base tool to search for accurate information.\n\nCustomer Question Title: {question_title}\nCustomer Question Details: {text}\n\nIMPORTANT: If you need specific information about Lysa's services, fees, policies, etc., use ONLY the search_knowledge_base tool. Do NOT provide any answer in <answer> tags until AFTER you have used the tool.\n\nWorkflow:\n1. Use the search_knowledge_base tool if you need specific information\n2. Wait for the tool results\n3. Then provide your response based on the search results\n\nDo NOT mix tool usage with <answer> tags in the same response.",
         api_url="https://api.groq.com/openai/v1/chat/completions",
         api_key=groq_api_key,
         rpm_limit=50,
         height=400,
         font_family="Arial",
-        model="deepseek-r1-distill-llama-70b",
-        max_tokens=400,
+        model="meta-llama/llama-4-scout-17b-16e-instruct",
+        max_tokens=1000,
         temperature=0.7,
         key="test_custom_component",
         token_cost=input_price,
         output_token_cost=output_price,
         text=selected_q['body'],
-        question_title=selected_q['title']
+        question_title=selected_q['title'],
+        # Pinecone integration parameters
+        pinecone_api_key=pinecone_api_key,
+        pinecone_environment=pinecone_environment,
+        pinecone_index_name=pinecone_index_name,
+        pinecone_host=pinecone_host,
+        openai_api_key=openai_api_key,
+        embedding_model=embedding_model,
+        search_top=search_top
     )
 
-
-
-# Footer
 st.markdown("---")
 st.markdown("*Built for Lysa Customer Support Team*")
