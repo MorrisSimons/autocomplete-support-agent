@@ -357,12 +357,21 @@ class Copilot extends StreamlitComponentBase<State> {
           
           if (searchData.matches && searchData.matches.length > 0) {
             const results = searchData.matches
-              .map((match: any) => match.metadata?.text || match.metadata?.content || 'No content')
-              .filter((text: any) => text !== 'No content');
+              .map((match: any) => ({
+                title: match.metadata?.title || 'No title',
+                source: match.metadata?.source || 'No source',
+                text: match.metadata?.text || match.metadata?.content || 'No content'
+              }))
+              .filter((result: any) => result.text !== 'No content');
             
             if (results.length > 0) {
-              return `Found ${results.length} relevant results:\n${results.join('\n\n')}`;
+              console.log("Found results:", results);
+              return JSON.stringify({
+                count: results.length,
+                results: results
+              }, null, 2);
             }
+            
           }
           
           // No results found
@@ -382,7 +391,7 @@ class Copilot extends StreamlitComponentBase<State> {
 
   // Add follow-up call method for tool results
   private makeFollowUpCall = async (apiUrl: string, userInput: string, toolResults: string[]): Promise<string> => {
-    const followUpPrompt = `Based on search results: ${toolResults.join('\n')}\n\nComplete: "${userInput}"`;
+    const followUpPrompt = `Based on the following search results from Lysa's knowledge base, please provide a helpful response to the customer question.\n\nSearch Results:\n${toolResults.join('\n\n')}\n\nCustomer Question: "${userInput}"\n\nPlease provide a comprehensive answer based on the search results above. Include source references where appropriate.`;
     
     const {prompt_template, api_key, height, fontFamily, border, text: questionText, question_title, ...model_kwargs} = this.props.args;
     const prompt = prompt_template
@@ -393,6 +402,9 @@ class Copilot extends StreamlitComponentBase<State> {
       this.props.args["api_format"] === "chat" ||
       apiUrl.includes('/chat/completions')
     );
+    
+    // Create a new abort controller for the follow-up call to avoid conflicts
+    const followUpAbortController = new AbortController();
 
     let payload;
     if (isChatApi) {
@@ -434,7 +446,7 @@ class Copilot extends StreamlitComponentBase<State> {
         method: "POST",
         headers: headers,
         body: JSON.stringify(payload),
-        signal: this.abortController.signal
+        signal: followUpAbortController.signal
       });
 
       if (!response.ok) {
