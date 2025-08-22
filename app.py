@@ -126,7 +126,7 @@ with col2:
     output_price = st.number_input("Output price per 1M tokens ($)", value=0.10, step=0.01)
 
     user_input = copilot(
-        prompt_template="[SYSTEM] You are an autocomplete assistant for Lysa customer support. You have access to a knowledge base tool to search for accurate information.\n\nCustomer Question Title: {question_title}\nCustomer Question Details: {text}\n\nIMPORTANT: If you need specific information about Lysa's services, fees, policies, etc., use ONLY the search_knowledge_base tool. Do NOT provide any answer in <answer> tags until AFTER you have used the tool.\n\nWorkflow:\n1. Use the search_knowledge_base tool if you need specific information\n2. Wait for the tool results\n3. Then provide your response based on the search results\n\nDo NOT mix tool usage with <answer> tags in the same response.",
+        prompt_template="[SYSTEM] You are an AUTOCOMPLETE assistant for Lysa customer support so you continue the the sentence naturally. You have access to a knowledge base tool to search for accurate information.\n\nCustomer Question Title: {question_title}\nCustomer Question Details: {text}\n\nIMPORTANT: If you need specific information about Lysa's services, fees, policies, etc., use ONLY the search_knowledge_base tool. Do NOT provide any answer in <answer> tags until AFTER you have used the tool.\n\nWorkflow:\n1. Use the search_knowledge_base tool if you need specific information\n2. Wait for the tool results\n3. Then provide your response based on the search results\n\nDo NOT mix tool usage with <answer> tags in the same response.",
         api_url="https://api.groq.com/openai/v1/chat/completions",
         api_key=groq_api_key,
         rpm_limit=50,

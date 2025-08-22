@@ -391,7 +391,7 @@ class Copilot extends StreamlitComponentBase<State> {
 
   // Add follow-up call method for tool results
   private makeFollowUpCall = async (apiUrl: string, userInput: string, toolResults: string[]): Promise<string> => {
-    const followUpPrompt = `Based on the following search results from Lysa's knowledge base, please provide a helpful response to the customer question.\n\nSearch Results:\n${toolResults.join('\n\n')}\n\nCustomer Question: "${userInput}"\n\nPlease provide a comprehensive answer based on the search results above. Include source references where appropriate.`;
+    const followUpPrompt = `You are an AUTOCOMPLETE assistant for Lysa customer support. Continue the user's message naturally without any formatting or extra text.\n\nUser's partial message: "${userInput}"\n\nSearch Results from Lysa's knowledge base:\n${toolResults.join('\n\n')}\n\nRULES:\n- Continue exactly from where the user stopped\n- NO ellipses (...) at the beginning\n- NO extra text like "(I'll wait...)" or similar\n- NO quotes or formatting\n- Just continue the sentence naturally using the search results\n\nContinue from "${userInput}":`;
     
     const {prompt_template, api_key, height, fontFamily, border, text: questionText, question_title, ...model_kwargs} = this.props.args;
     const prompt = prompt_template
@@ -511,7 +511,7 @@ private callApi = async (text: string, api_upl: string): Promise<string> => {
 
   const {prompt_template, api_url, api_key, height, fontFamily, border, text: questionText, question_title, ...model_kwargs} = this.props.args;
   const prompt = prompt_template
-    .replace("{text}", questionText || "")
+    .replace("{text}", text) // Use the actual user input for autocomplete
     .replace("{question_title}", question_title || ""); // format the prompt with both placeholders
   
   // Generalize to support both chat and legacy completions APIs, not just Groq
