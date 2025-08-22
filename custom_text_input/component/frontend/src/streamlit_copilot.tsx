@@ -391,8 +391,23 @@ class Copilot extends StreamlitComponentBase<State> {
 
   // Add follow-up call method for tool results
   private makeFollowUpCall = async (apiUrl: string, userInput: string, toolResults: string[]): Promise<string> => {
-    const followUpPrompt = `You are an AUTOCOMPLETE assistant for Lysa customer support. Continue the user's message naturally without any formatting or extra text.\n\nUser's partial message: "${userInput}"\n\nSearch Results from Lysa's knowledge base:\n${toolResults.join('\n\n')}\n\nRULES:\n- Continue exactly from where the user stopped\n- NO ellipses (...) at the beginning\n- NO extra text like "(I'll wait...)" or similar\n- NO quotes or formatting\n- Just continue the sentence naturally using the search results\n\nContinue from "${userInput}":`;
-    
+    console.log(userInput)
+    const followUpPrompt = [
+      "You are an AUTOCOMPLETE assistant for Lysa customer support.",
+      "Continue the user's message naturally without any formatting or extra text.",
+      "",
+      `User's partial message: "${userInput}"`,
+      "",
+      "Search Results from Lysa's knowledge base:",
+      toolResults.join('\n\n'),
+      "",
+      "RULES:",
+      "- You can only autocomplete if it's really needed otherwise don't; just return <done>",
+      "- Continue exactly from where the user stopped dont start with ... or anything like that; JUST CONTINUE THE SENTENCE NATURALLY by continuing the users partial message",
+      "- Answer all questions by searching the knowledge base",
+      "",
+      `Continue from "${userInput}" and IMPORTANT: ADD THE SOURCE WITH LINK TO THE CLAIM AT THE END like this: [Source](url)`
+    ].join('\n');
     const {prompt_template, api_key, height, fontFamily, border, text: questionText, question_title, ...model_kwargs} = this.props.args;
     const prompt = prompt_template
       .replace("{text}", questionText || "")
